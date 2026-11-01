@@ -1,0 +1,39 @@
+<!doctype html>
+<html dir="rtl" lang="he">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#7a1f24">
+<title>פר בקר</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon192.png">
+<link rel="apple-touch-icon" href="icon192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="פר בקר">
+<style>
+html,body{margin:0;height:100%;background:#7a1f24;font-family:Arial,sans-serif}
+iframe{position:fixed;inset:0;width:100%;height:100%;border:0;background:#f4f1ec}
+#splash{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;color:#fff;z-index:2;transition:opacity .4s}
+#splash img{width:150px;height:150px;border-radius:32px;background:#fff}
+#msg{display:none;position:fixed;inset:0;background:#f4f1ec;color:#222;padding:30px;font-size:18px;text-align:center;z-index:3}
+</style>
+</head>
+<body>
+<div id="splash"><img src="icon512.png" alt=""><div>טוען…</div></div>
+<div id="msg">לא נמצא קוד עובד.<br><br>יש לפתוח פעם אחת את הקישור האישי שקיבלת מהמנהל, ואז להתקין את האפליקציה.</div>
+<script>
+var APP_URL = 'https://script.google.com/macros/s/AKfycbyP3wDHbnMoq-6-5MmTxx6Tv6HPt3OIZShluuvg0wHttHzRFcure4Taw5MMMC5Mxo06BQ/exec';
+var u = new URLSearchParams(location.search).get('u');
+try { if (u) localStorage.setItem('pb_u', u); else u = localStorage.getItem('pb_u'); } catch (e) {}
+if (!u) { document.getElementById('splash').style.display = 'none'; document.getElementById('msg').style.display = 'block'; }
+else {
+  var f = document.createElement('iframe');
+  f.src = APP_URL + '?u=' + encodeURIComponent(u);
+  f.allow = 'camera; geolocation';
+  f.onload = function () { var s = document.getElementById('splash'); s.style.opacity = 0; setTimeout(function () { s.remove(); }, 400); };
+  document.body.appendChild(f);
+}
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () {});
+</script>
+</body>
+</html>
