@@ -15,11 +15,16 @@ html,body{margin:0;height:100%;background:#7a1f24;font-family:Arial,sans-serif}
 iframe{position:fixed;inset:0;width:100%;height:100%;border:0;background:#f4f1ec}
 #splash{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;color:#fff;z-index:2;transition:opacity .4s}
 #splash img{width:150px;height:150px;border-radius:32px;background:#fff}
+#pushbar{display:none;position:fixed;top:calc(env(safe-area-inset-top) + 10px);left:10px;right:10px;z-index:4;background:#fff;color:#222;border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.25);padding:14px 16px;font-size:16px;align-items:center;gap:10px}
+#pushbar b{flex:1}
+#pushbar button{border:0;border-radius:10px;padding:10px 14px;font-size:15px;font-weight:bold}
+#pbyes{background:#7a1f24;color:#fff}#pbno{background:#eee;color:#444}
 #msg{display:none;position:fixed;inset:0;background:#f4f1ec;color:#222;padding:30px;font-size:18px;text-align:center;z-index:3}
 </style>
 </head>
 <body>
 <div id="splash"><img src="icon512.png" alt=""><div>טוען…</div></div>
+<div id="pushbar"><b>לקבל תזכורות לטלפון?</b><button id="pbyes">הפעלה</button><button id="pbno">לא עכשיו</button></div>
 <div id="msg">לא נמצא קוד עובד.<br><br>יש לפתוח פעם אחת את הקישור האישי שקיבלת מהמנהל, ואז להתקין את האפליקציה.</div>
 <script>
 var APP_URL = 'https://script.google.com/macros/s/AKfycbyP3wDHbnMoq-6-5MmTxx6Tv6HPt3OIZShluuvg0wHttHzRFcure4Taw5MMMC5Mxo06BQ/exec';
@@ -34,6 +39,34 @@ else {
   document.body.appendChild(f);
 }
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () {});
+
+/* ---- התראות לטלפון ---- */
+var VAPID = 'BLdukseftel8f8hdq3YpvCeKYj1PFdP7XMiU2L42MXi2DcNDI6jTtztNIxBxzlo1ai0809WHTMlE6NAyuUyMlmE';
+var appWin = null, mySub = null;
+function b64(s) { s = s.replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; var r = atob(s), a = new Uint8Array(r.length); for (var i = 0; i < r.length; i++) a[i] = r.charCodeAt(i); return a; }
+function canPush() { return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
+function tellApp() { if (appWin && mySub) appWin.postMessage({ pb: 'sub', sub: mySub }, '*'); }
+window.addEventListener('message', function (e) { if (e.data && e.data.pb === 'hello') { appWin = e.source; tellApp(); } });
+function subscribe() {
+  return navigator.serviceWorker.ready.then(function (reg) {
+    return reg.pushManager.getSubscription().then(function (s) {
+      return s || reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64(VAPID) });
+    });
+  }).then(function (s) { mySub = JSON.parse(JSON.stringify(s)); tellApp(); }).catch(function () {});
+}
+function later() { try { localStorage.setItem('pb_push_later', String(Date.now())); } catch (e) {} }
+function askedRecently() { try { return Date.now() - Number(localStorage.getItem('pb_push_later') || 0) < 3 * 86400000; } catch (e) { return false; } }
+if (u && canPush()) {
+  if (Notification.permission === 'granted') subscribe();
+  else if (Notification.permission === 'default' && !askedRecently()) setTimeout(function () {
+    var bar = document.getElementById('pushbar'); bar.style.display = 'flex';
+    document.getElementById('pbno').onclick = function () { bar.style.display = 'none'; later(); };
+    document.getElementById('pbyes').onclick = function () {
+      bar.style.display = 'none';
+      Notification.requestPermission().then(function (p) { if (p === 'granted') subscribe(); else later(); });
+    };
+  }, 4000);
+}
 </script>
 </body>
 </html>
