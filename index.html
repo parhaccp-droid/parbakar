@@ -19,12 +19,23 @@ iframe{position:fixed;inset:0;width:100%;height:100%;border:0;background:#f4f1ec
 #pushbar b{flex:1}
 #pushbar button{border:0;border-radius:10px;padding:10px 14px;font-size:15px;font-weight:bold}
 #pbyes{background:#7a1f24;color:#fff}#pbno{background:#eee;color:#444}
+#scan{display:none;position:fixed;inset:0;z-index:9;background:#000}
+#scan video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+#scan .frame{position:absolute;left:8%;right:8%;top:30%;height:30%;border:4px solid #fff;border-radius:18px;box-shadow:0 0 0 2000px rgba(0,0,0,.45)}
+#scan .frame.hit{border-color:#3ddc84}
+#scan .tip{position:absolute;top:calc(env(safe-area-inset-top) + 20px);left:0;right:0;text-align:center;color:#fff;font-size:20px;font-weight:bold}
+#scan .bar{position:absolute;bottom:calc(env(safe-area-inset-bottom) + 24px);left:0;right:0;display:flex;justify-content:center;gap:16px}
+#scan .bar{flex-wrap:wrap;padding:0 10px}
+#scan .bar button{border:0;border-radius:16px;padding:16px 20px;font-size:18px;font-weight:bold;background:#fff;color:#222}
+#scan .bar #snot{background:#d39b2a;color:#fff}
+#scan .bar #sclose{background:#7a1f24;color:#fff}
 #msg{display:none;position:fixed;inset:0;background:#f4f1ec;color:#222;padding:30px;font-size:18px;text-align:center;z-index:3}
 </style>
 </head>
 <body>
 <div id="splash"><img src="icon512.png" alt=""><div>טוען…</div></div>
 <div id="pushbar"><b>לקבל תזכורות לטלפון?</b><button id="pbyes">הפעלה</button><button id="pbno">לא עכשיו</button></div>
+<div id="scan"><video id="svid" playsinline muted></video><div class="frame" id="sfr"></div><div class="tip">כוון את הברקוד למסגרת</div><div class="bar"><button id="storch">פנס</button><button id="snot">לא נקלט – שלח למנהל</button><button id="sclose">ביטול</button></div></div>
 <div id="msg">לא נמצא קוד עובד.<br><br>יש לפתוח פעם אחת את הקישור האישי שקיבלת מהמנהל, ואז להתקין את האפליקציה.</div>
 <script>
 var APP_URL = 'https://script.google.com/macros/s/AKfycbyP3wDHbnMoq-6-5MmTxx6Tv6HPt3OIZShluuvg0wHttHzRFcure4Taw5MMMC5Mxo06BQ/exec';
@@ -34,7 +45,7 @@ if (!u) { document.getElementById('splash').style.display = 'none'; document.get
 else {
   var f = document.createElement('iframe');
   f.src = APP_URL + '?u=' + encodeURIComponent(u);
-  f.allow = 'camera; geolocation';
+  f.allow = 'camera; geolocation; clipboard-read';
   f.onload = function () { var s = document.getElementById('splash'); s.style.opacity = 0; setTimeout(function () { s.remove(); }, 400); };
   document.body.appendChild(f);
 }
@@ -46,7 +57,72 @@ var appWin = null, mySub = null;
 function b64(s) { s = s.replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; var r = atob(s), a = new Uint8Array(r.length); for (var i = 0; i < r.length; i++) a[i] = r.charCodeAt(i); return a; }
 function canPush() { return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
 function tellApp() { if (appWin && mySub) appWin.postMessage({ pb: 'sub', sub: mySub }, '*'); }
-window.addEventListener('message', function (e) { if (e.data && e.data.pb === 'hello') { appWin = e.source; tellApp(); } });
+window.addEventListener('message', function (e) {
+  var d = e.data || {};
+  if (d.pb === 'hello') { appWin = e.source; appWin.postMessage({ pb: 'launcher', scan: true }, '*'); tellApp(); }
+  if (d.pb === 'scan') { appWin = e.source; openScan(); }
+});
+
+/* ---- סורק ברקודים (המצלמה נפתחת כאן ולא בתוך הטופס) ---- */
+var scanStream = null, scanTimer = null, zx = null;
+function grabFrame() {   // תמונה של המדבקה מהרגע של הסריקה (נשלחת למנהל רק אם המדבקה לא מוכרת)
+  try {
+    var v = document.getElementById('svid'), w = v.videoWidth, h = v.videoHeight; if (!w) return '';
+    var k = Math.min(1, 1280 / Math.max(w, h)), c = document.createElement('canvas');
+    c.width = Math.round(w * k); c.height = Math.round(h * k); c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+    return c.toDataURL('image/jpeg', 0.72);
+  } catch (e) { return ''; }
+}
+function scanDone(codes, img) {
+  clearInterval(scanTimer); scanTimer = null;
+  if (zx) { try { zx.reset(); } catch (e) {} }
+  if (scanStream) scanStream.getTracks().forEach(function (t) { t.stop(); });
+  scanStream = null;
+  document.getElementById('scan').style.display = 'none';
+  document.getElementById('sfr').className = 'frame';
+  if (appWin) appWin.postMessage({ pb: 'scanned', codes: codes, img: img || '' }, '*');
+}
+function beep() {
+  try { if (navigator.vibrate) navigator.vibrate(120); var a = new (window.AudioContext || window.webkitAudioContext)(), o = a.createOscillator(); o.frequency.value = 1500; o.connect(a.destination); o.start(); setTimeout(function () { o.stop(); a.close(); }, 120); } catch (e) {}
+}
+function gotCodes(found) {
+  // אחרי הקריאה הראשונה אוספים עוד רגע, כדי לתפוס גם ברקוד נוסף על אותה מדבקה (למשל הריבוע של מילועוף)
+  if (gotCodes.list) { found.forEach(function (c) { if (gotCodes.list.indexOf(c) < 0) gotCodes.list.push(c); }); return; }
+  gotCodes.list = found.slice(); gotCodes.img = grabFrame(); beep(); document.getElementById('sfr').className = 'frame hit';
+  setTimeout(function () { var l = gotCodes.list; gotCodes.list = null; scanDone(l, gotCodes.img); }, 700);
+}
+function openScan() {
+  gotCodes.list = null;
+  var box = document.getElementById('scan'), v = document.getElementById('svid');
+  box.style.display = 'block';
+  document.getElementById('sclose').onclick = function () { gotCodes.list = null; scanDone([]); };
+  document.getElementById('snot').onclick = function () { var img = grabFrame(); gotCodes.list = null; if (img) { beep(); scanDone([], img); } };
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false }).then(function (st) {
+    scanStream = st; v.srcObject = st; v.play();
+    var track = st.getVideoTracks()[0], torch = false, tb = document.getElementById('storch');
+    var caps = track.getCapabilities ? track.getCapabilities() : {};
+    tb.style.display = caps.torch ? '' : 'none';
+    tb.onclick = function () { torch = !torch; track.applyConstraints({ advanced: [{ torch: torch }] }).catch(function () {}); };
+    if ('BarcodeDetector' in window) {
+      var det = new BarcodeDetector({ formats: ['code_128', 'ean_13', 'data_matrix', 'qr_code', 'ean_8', 'itf', 'code_39', 'upc_a'] });
+      scanTimer = setInterval(function () {
+        if (v.readyState < 2) return;
+        det.detect(v).then(function (r) { if (r.length) gotCodes(r.map(function (x) { return x.rawValue; })); }).catch(function () {});
+      }, 150);
+    } else zxScan(v);
+  }).catch(function () { alert('אין גישה למצלמה. יש לאשר הרשאת מצלמה לאפליקציה.'); scanDone([]); });
+}
+function zxScan(v) {   // אייפון ודפדפנים בלי סורק מובנה
+  function go() {
+    var hints = new Map(); hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+    zx = new ZXing.BrowserMultiFormatReader(hints);
+    zx.decodeFromVideoElementContinuously(v, function (res) { if (res) gotCodes([res.getText()]); });
+  }
+  if (window.ZXing) return go();
+  var sc = document.createElement('script'); sc.src = 'https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js';
+  sc.onload = go; sc.onerror = function () { alert('לא ניתן לטעון את הסורק'); scanDone([]); };
+  document.head.appendChild(sc);
+}
 function subscribe() {
   return navigator.serviceWorker.ready.then(function (reg) {
     return reg.pushManager.getSubscription().then(function (s) {
