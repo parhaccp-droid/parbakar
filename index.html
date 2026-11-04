@@ -35,7 +35,7 @@ iframe{position:fixed;inset:0;width:100%;height:100%;border:0;background:#f4f1ec
 <body>
 <div id="splash"><img src="icon512.png" alt=""><div>טוען…</div></div>
 <div id="pushbar"><b>לקבל תזכורות לטלפון?</b><button id="pbyes">הפעלה</button><button id="pbno">לא עכשיו</button></div>
-<div id="scan"><video id="svid" playsinline muted></video><div class="frame" id="sfr"></div><div class="tip">כוון את הברקוד למסגרת</div><div class="bar"><button id="storch">פנס</button><button id="snot">לא נקלט – שלח למנהל</button><button id="sclose">ביטול</button></div></div>
+<div id="scan"><video id="svid" playsinline muted></video><div class="frame" id="sfr"></div><div class="tip" id="stip">קרב את הטלפון למדבקה (20–30 ס"מ) – רק מדבקה אחת במסגרת</div><div class="bar"><button id="storch">פנס</button><button id="snot">הקלדת המספר</button><button id="sclose">ביטול</button></div></div>
 <div id="msg">לא נמצא קוד עובד.<br><br>יש לפתוח פעם אחת את הקישור האישי שקיבלת מהמנהל, ואז להתקין את האפליקציה.</div>
 <script>
 var APP_URL = 'https://script.google.com/macros/s/AKfycbyP3wDHbnMoq-6-5MmTxx6Tv6HPt3OIZShluuvg0wHttHzRFcure4Taw5MMMC5Mxo06BQ/exec';
@@ -80,7 +80,8 @@ function scanDone(codes, img) {
   scanStream = null;
   document.getElementById('scan').style.display = 'none';
   document.getElementById('sfr').className = 'frame';
-  if (appWin) appWin.postMessage({ pb: 'scanned', codes: codes, img: img || '' }, '*');
+  if (appWin) appWin.postMessage({ pb: 'scanned', codes: codes, img: img || '', manual: !!scanDone.manual }, '*');
+  scanDone.manual = false;
 }
 function beep() {
   try { if (navigator.vibrate) navigator.vibrate(120); var a = new (window.AudioContext || window.webkitAudioContext)(), o = a.createOscillator(); o.frequency.value = 1500; o.connect(a.destination); o.start(); setTimeout(function () { o.stop(); a.close(); }, 120); } catch (e) {}
@@ -96,7 +97,7 @@ function openScan() {
   var box = document.getElementById('scan'), v = document.getElementById('svid');
   box.style.display = 'block';
   document.getElementById('sclose').onclick = function () { gotCodes.list = null; scanDone([]); };
-  document.getElementById('snot').onclick = function () { var img = grabFrame(); gotCodes.list = null; if (img) { beep(); scanDone([], img); } };
+  document.getElementById('snot').onclick = function () { gotCodes.list = null; scanDone.manual = true; scanDone([]); };
   navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false }).then(function (st) {
     scanStream = st; v.srcObject = st; v.play();
     var track = st.getVideoTracks()[0], torch = false, tb = document.getElementById('storch');
@@ -107,7 +108,12 @@ function openScan() {
       var det = new BarcodeDetector({ formats: ['code_128', 'ean_13', 'data_matrix', 'qr_code', 'ean_8', 'itf', 'code_39', 'upc_a'] });
       scanTimer = setInterval(function () {
         if (v.readyState < 2) return;
-        det.detect(v).then(function (r) { if (r.length) gotCodes(r.map(function (x) { return x.rawValue; })); }).catch(function () {});
+        det.detect(v).then(function (r) {
+          // רק ברקודים שבאמצע התמונה - כדי לא לערבב מדבקות של קרטונים שכנים
+          var W = v.videoWidth, H = v.videoHeight;
+          r = r.filter(function (x) { var b = x.boundingBox; if (!b || !W) return true; var cx = (b.x + b.width / 2) / W, cy = (b.y + b.height / 2) / H; return cx > 0.12 && cx < 0.88 && cy > 0.2 && cy < 0.8; });
+          if (r.length) gotCodes(r.map(function (x) { return x.rawValue; }));
+        }).catch(function () {});
       }, 150);
     } else zxScan(v);
   }).catch(function () { alert('אין גישה למצלמה. יש לאשר הרשאת מצלמה לאפליקציה.'); scanDone([]); });
