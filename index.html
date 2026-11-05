@@ -35,7 +35,7 @@ iframe{position:fixed;inset:0;width:100%;height:100%;border:0;background:#f4f1ec
 <body>
 <div id="splash"><img src="icon512.png" alt=""><div>טוען…</div></div>
 <div id="pushbar"><b>לקבל תזכורות לטלפון?</b><button id="pbyes">הפעלה</button><button id="pbno">לא עכשיו</button></div>
-<div id="scan"><video id="svid" playsinline muted></video><div class="frame" id="sfr"></div><div class="tip" id="stip">קרב את הטלפון למדבקה (20–30 ס"מ) – רק מדבקה אחת במסגרת</div><div class="bar"><button id="storch">פנס</button><button id="snot">הקלדת המספר</button><button id="sclose">ביטול</button></div></div>
+<div id="scan"><video id="svid" playsinline muted></video><div class="frame" id="sfr"></div><div class="tip" id="stip">קרב את הטלפון למדבקה – רק מה שבתוך המסגרת נקלט</div><div class="bar"><button id="storch">פנס</button><button id="snot">הקלדת המספר</button><button id="sclose">ביטול</button></div></div>
 <div id="msg">לא נמצא קוד עובד.<br><br>יש לפתוח פעם אחת את הקישור האישי שקיבלת מהמנהל, ואז להתקין את האפליקציה.</div>
 <script>
 var APP_URL = 'https://script.google.com/macros/s/AKfycbyP3wDHbnMoq-6-5MmTxx6Tv6HPt3OIZShluuvg0wHttHzRFcure4Taw5MMMC5Mxo06BQ/exec';
@@ -86,11 +86,22 @@ function scanDone(codes, img) {
 function beep() {
   try { if (navigator.vibrate) navigator.vibrate(120); var a = new (window.AudioContext || window.webkitAudioContext)(), o = a.createOscillator(); o.frequency.value = 1500; o.connect(a.destination); o.start(); setTimeout(function () { o.stop(); a.close(); }, 120); } catch (e) {}
 }
+// המסגרת הלבנה על המסך -> אותו אזור בתמונה של המצלמה (הווידאו מוגדל וחתוך למילוי המסך)
+function frameBox(v) {
+  var f = document.getElementById('sfr').getBoundingClientRect(), W = v.videoWidth, H = v.videoHeight;
+  if (!W) return null;
+  var sw = v.clientWidth, sh = v.clientHeight, k = Math.max(sw / W, sh / H), ox = (sw - W * k) / 2, oy = (sh - H * k) / 2, pad = 6;
+  return { x1: (f.left - ox - pad) / k, y1: (f.top - oy - pad) / k, x2: (f.right - ox + pad) / k, y2: (f.bottom - oy + pad) / k };
+}
+function inFrame(v, pts) {   // כל הנקודות של הברקוד חייבות להיות בתוך המסגרת
+  var b = frameBox(v); if (!b || !pts || !pts.length) return true;
+  return pts.every(function (p) { return p.x >= b.x1 && p.x <= b.x2 && p.y >= b.y1 && p.y <= b.y2; });
+}
 function gotCodes(found) {
   // אחרי הקריאה הראשונה אוספים עוד רגע, כדי לתפוס גם ברקוד נוסף על אותה מדבקה (למשל הריבוע של מילועוף)
   if (gotCodes.list) { found.forEach(function (c) { if (gotCodes.list.indexOf(c) < 0) gotCodes.list.push(c); }); return; }
   gotCodes.list = found.slice(); gotCodes.img = grabFrame(); beep(); document.getElementById('sfr').className = 'frame hit';
-  setTimeout(function () { var l = gotCodes.list; gotCodes.list = null; scanDone(l, gotCodes.img); }, 700);
+  setTimeout(function () { var l = gotCodes.list; gotCodes.list = null; scanDone(l, gotCodes.img); }, 1500);   // אוסף עוד רגע את שאר הברקודים שבמסגרת
 }
 function openScan() {
   gotCodes.list = null;
@@ -109,9 +120,8 @@ function openScan() {
       scanTimer = setInterval(function () {
         if (v.readyState < 2) return;
         det.detect(v).then(function (r) {
-          // רק ברקודים שבאמצע התמונה - כדי לא לערבב מדבקות של קרטונים שכנים
-          var W = v.videoWidth, H = v.videoHeight;
-          r = r.filter(function (x) { var b = x.boundingBox; if (!b || !W) return true; var cx = (b.x + b.width / 2) / W, cy = (b.y + b.height / 2) / H; return cx > 0.12 && cx < 0.88 && cy > 0.2 && cy < 0.8; });
+          // רק ברקודים שנמצאים כולם בתוך המסגרת הלבנה
+          r = r.filter(function (x) { var b = x.boundingBox; return inFrame(v, x.cornerPoints && x.cornerPoints.length ? x.cornerPoints : b ? [{ x: b.x, y: b.y }, { x: b.x + b.width, y: b.y + b.height }] : null); });
           if (r.length) gotCodes(r.map(function (x) { return x.rawValue; }));
         }).catch(function () {});
       }, 150);
@@ -122,7 +132,11 @@ function zxScan(v) {   // אייפון ודפדפנים בלי סורק מובנ
   function go() {
     var hints = new Map(); hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
     zx = new ZXing.BrowserMultiFormatReader(hints);
-    zx.decodeFromVideoElementContinuously(v, function (res) { if (res) gotCodes([res.getText()]); });
+    zx.decodeFromVideoElementContinuously(v, function (res) {
+      if (!res) return;
+      var pts = (res.getResultPoints() || []).map(function (p) { return { x: p.getX(), y: p.getY() }; });
+      if (inFrame(v, pts)) gotCodes([res.getText()]);
+    });
   }
   if (window.ZXing) return go();
   var sc = document.createElement('script'); sc.src = 'https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js';
