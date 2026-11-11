@@ -73,7 +73,7 @@ function tellApp() { if (appWin && mySub) appWin.postMessage({ pb: 'sub', sub: m
 window.addEventListener('message', function (e) {
   var d = e.data || {};
   if (d.pb === 'hello') { appWin = e.source; appWin.postMessage({ pb: 'launcher', scan: true, bar: true }, '*'); tellApp(); }
-  if (d.pb === 'scanbar') { appWin = e.source; if (d.on) barOn(); else barOff(); }
+  if (d.pb === 'scanbar') { appWin = e.source; if (d.label) bar.label = d.label; if (d.torch) document.getElementById('btorch').textContent = d.torch; if (d.on) { if (bar.on) document.getElementById('blast').textContent = bar.label; barOn(); } else barOff(); }
   if (d.pb === 'scaninfo') barInfo(d.text || '', d.ok !== false);
   if (d.pb === 'scan') { appWin = e.source; openScan(); }
 });
@@ -194,7 +194,7 @@ function barInfo(text, ok) {
 function barOn() {
   if (bar.on) return;
   bar.on = true; bar.list = null; bar.lastKey = '';
-  document.body.classList.add('sbar'); document.getElementById('blast').textContent = 'קרב מדבקה למסגרת';
+  document.body.classList.add('sbar'); document.getElementById('blast').textContent = bar.label || 'קרב מדבקה למסגרת';
   var v = document.getElementById('bvid');
   navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false }).then(function (st) {
     if (!bar.on) { st.getTracks().forEach(function (t) { t.stop(); }); return; }
