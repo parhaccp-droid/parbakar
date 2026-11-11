@@ -30,12 +30,25 @@ iframe{position:fixed;inset:0;width:100%;height:100%;border:0;background:#f4f1ec
 #scan .bar #snot{background:#d39b2a;color:#fff}
 #scan .bar #sclose{background:#7a1f24;color:#fff}
 #msg{display:none;position:fixed;inset:0;background:#f4f1ec;color:#222;padding:30px;font-size:18px;text-align:center;z-index:3}
+/* סורק פס עליון: המצלמה דלוקה כל הזמן בחלק העליון של המסך, והאפליקציה מתחת */
+:root{--sbh:33vh}
+body.sbar iframe{top:var(--sbh);height:calc(100% - var(--sbh))}
+#sbar{display:none;position:fixed;top:0;left:0;right:0;height:var(--sbh);z-index:8;background:#000;overflow:hidden}
+body.sbar #sbar{display:block}
+#sbar video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+#sbar .frame{position:absolute;left:10%;right:10%;top:calc(env(safe-area-inset-top) + 18%);bottom:16%;border:3px solid #fff;border-radius:14px;box-shadow:0 0 0 2000px rgba(0,0,0,.35);transition:border-color .15s}
+#sbar .frame.hit{border-color:#3ddc84}
+#sbar .frame.bad{border-color:#ff5a5a}
+#sbar .last{position:absolute;top:calc(env(safe-area-inset-top) + 6px);right:10px;left:96px;color:#fff;font-size:15px;font-weight:bold;text-shadow:0 1px 3px #000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#sbar .btns{position:absolute;top:calc(env(safe-area-inset-top) + 4px);left:6px;display:flex;gap:6px}
+#sbar .btns button{border:0;border-radius:10px;padding:6px 10px;font-size:14px;font-weight:bold;background:rgba(255,255,255,.9);color:#222}
 </style>
 </head>
 <body>
 <div id="splash"><img src="icon512.png" alt=""><div>טוען…</div></div>
 <div id="pushbar"><b>לקבל תזכורות לטלפון?</b><button id="pbyes">הפעלה</button><button id="pbno">לא עכשיו</button></div>
 <div id="scan"><video id="svid" playsinline muted></video><div class="frame" id="sfr"></div><div class="tip" id="stip">קרב את הטלפון למדבקה – רק מה שבתוך המסגרת נקלט</div><div class="bar"><button id="storch">פנס</button><button id="snot">הקלדת המספר</button><button id="sclose">ביטול</button></div></div>
+<div id="sbar"><video id="bvid" playsinline muted></video><div class="frame" id="bfr"></div><div class="last" id="blast">קרב מדבקה למסגרת</div><div class="btns"><button id="btorch">פנס</button></div></div>
 <div id="msg">לא נמצא קוד עובד.<br><br>יש לפתוח פעם אחת את הקישור האישי שקיבלת מהמנהל, ואז להתקין את האפליקציה.</div>
 <script>
 var APP_URL = 'https://script.google.com/macros/s/AKfycbyP3wDHbnMoq-6-5MmTxx6Tv6HPt3OIZShluuvg0wHttHzRFcure4Taw5MMMC5Mxo06BQ/exec';
@@ -59,7 +72,9 @@ function canPush() { return 'serviceWorker' in navigator && 'PushManager' in win
 function tellApp() { if (appWin && mySub) appWin.postMessage({ pb: 'sub', sub: mySub }, '*'); }
 window.addEventListener('message', function (e) {
   var d = e.data || {};
-  if (d.pb === 'hello') { appWin = e.source; appWin.postMessage({ pb: 'launcher', scan: true }, '*'); tellApp(); }
+  if (d.pb === 'hello') { appWin = e.source; appWin.postMessage({ pb: 'launcher', scan: true, bar: true }, '*'); tellApp(); }
+  if (d.pb === 'scanbar') { appWin = e.source; if (d.on) barOn(); else barOff(); }
+  if (d.pb === 'scaninfo') barInfo(d.text || '', d.ok !== false);
   if (d.pb === 'scan') { appWin = e.source; openScan(); }
 });
 
@@ -143,6 +158,89 @@ function zxScan(v) {   // אייפון ודפדפנים בלי סורק מובנ
   sc.onload = go; sc.onerror = function () { alert('לא ניתן לטעון את הסורק'); scanDone([]); };
   document.head.appendChild(sc);
 }
+/* ---- סורק פס עליון (סריקת כמה קרטונים): המצלמה נשארת דלוקה, כל מדבקה נשלחת לאפליקציה והמצלמה ממשיכה ---- */
+var bar = { on: false, stream: null, timer: null, zx: null, list: null, lastKey: '', lastAt: 0 };
+function barBox(v) {
+  var f = document.getElementById('bfr').getBoundingClientRect(), W = v.videoWidth, H = v.videoHeight;
+  if (!W) return null;
+  var sw = v.clientWidth, sh = v.clientHeight, k = Math.max(sw / W, sh / H), ox = (sw - W * k) / 2, oy = (sh - H * k) / 2, pad = 6;
+  return { x1: (f.left - ox - pad) / k, y1: (f.top - oy - pad) / k, x2: (f.right - ox + pad) / k, y2: (f.bottom - oy + pad) / k };
+}
+function barIn(v, pts) { var b = barBox(v); if (!b || !pts || !pts.length) return true; return pts.every(function (p) { return p.x >= b.x1 && p.x <= b.x2 && p.y >= b.y1 && p.y <= b.y2; }); }
+function barGrab() {
+  try {
+    var v = document.getElementById('bvid'), w = v.videoWidth, h = v.videoHeight; if (!w) return '';
+    var k = Math.min(1, 1280 / Math.max(w, h)), c = document.createElement('canvas');
+    c.width = Math.round(w * k); c.height = Math.round(h * k); c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+    return c.toDataURL('image/jpeg', 0.72);
+  } catch (e) { return ''; }
+}
+function barGot(found) {
+  if (!bar.on) return;
+  if (bar.list) { found.forEach(function (c) { if (bar.list.indexOf(c) < 0) bar.list.push(c); }); return; }
+  var key = found.slice().sort().join('|');
+  if (key === bar.lastKey && Date.now() - bar.lastAt < 3000) { bar.lastAt = Date.now(); return; }   // אותה מדבקה עדיין מול המצלמה
+  bar.list = found.slice(); var img = barGrab(); beep(); document.getElementById('bfr').className = 'frame hit';
+  setTimeout(function () {
+    var l = bar.list; bar.list = null; bar.lastKey = l.slice().sort().join('|'); bar.lastAt = Date.now();
+    if (appWin) appWin.postMessage({ pb: 'scanned1', codes: l, img: img }, '*');
+    setTimeout(function () { document.getElementById('bfr').className = 'frame'; }, 500);
+  }, 900);
+}
+function barInfo(text, ok) {
+  document.getElementById('blast').textContent = text;
+  if (!ok) { document.getElementById('bfr').className = 'frame bad'; setTimeout(function () { document.getElementById('bfr').className = 'frame'; }, 900); }
+}
+function barOn() {
+  if (bar.on) return;
+  bar.on = true; bar.list = null; bar.lastKey = '';
+  document.body.classList.add('sbar'); document.getElementById('blast').textContent = 'קרב מדבקה למסגרת';
+  var v = document.getElementById('bvid');
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false }).then(function (st) {
+    if (!bar.on) { st.getTracks().forEach(function (t) { t.stop(); }); return; }
+    bar.stream = st; v.srcObject = st; v.play();
+    var track = st.getVideoTracks()[0], torch = false, tb = document.getElementById('btorch');
+    var caps = track.getCapabilities ? track.getCapabilities() : {};
+    tb.style.display = caps.torch ? '' : 'none';
+    tb.onclick = function () { torch = !torch; track.applyConstraints({ advanced: [{ torch: torch }] }).catch(function () {}); };
+    if ('BarcodeDetector' in window) {
+      var det = new BarcodeDetector({ formats: ['code_128', 'ean_13', 'data_matrix', 'qr_code', 'ean_8', 'itf', 'code_39', 'upc_a'] });
+      bar.timer = setInterval(function () {
+        if (v.readyState < 2) return;
+        det.detect(v).then(function (r) {
+          r = r.filter(function (x) { var b = x.boundingBox; return barIn(v, x.cornerPoints && x.cornerPoints.length ? x.cornerPoints : b ? [{ x: b.x, y: b.y }, { x: b.x + b.width, y: b.y + b.height }] : null); });
+          if (r.length) barGot(r.map(function (x) { return x.rawValue; }));
+        }).catch(function () {});
+      }, 150);
+    } else {
+      var go = function () {
+        var hints = new Map(); hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+        bar.zx = new ZXing.BrowserMultiFormatReader(hints);
+        bar.zx.decodeFromVideoElementContinuously(v, function (res) {
+          if (!res) return;
+          var pts = (res.getResultPoints() || []).map(function (p) { return { x: p.getX(), y: p.getY() }; });
+          if (barIn(v, pts)) barGot([res.getText()]);
+        });
+      };
+      if (window.ZXing) go(); else { var sc = document.createElement('script'); sc.src = 'https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js'; sc.onload = go; document.head.appendChild(sc); }
+    }
+  }).catch(function () { alert('אין גישה למצלמה. יש לאשר הרשאת מצלמה לאפליקציה.'); barOff(true); });
+}
+function barStop() {
+  clearInterval(bar.timer); bar.timer = null;
+  if (bar.zx) { try { bar.zx.reset(); } catch (e) {} bar.zx = null; }
+  if (bar.stream) bar.stream.getTracks().forEach(function (t) { t.stop(); });
+  bar.stream = null;
+}
+function barOff(tell) {
+  bar.on = false; barStop(); document.body.classList.remove('sbar');
+  if (tell && appWin) appWin.postMessage({ pb: 'scanbaroff' }, '*');
+}
+// כשהאפליקציה ברקע – מכבים את המצלמה; כשחוזרים – מדליקים שוב
+document.addEventListener('visibilitychange', function () {
+  if (!bar.on) return;
+  if (document.hidden) barStop(); else { bar.on = false; barOn(); }
+});
 function subscribe() {
   return navigator.serviceWorker.ready.then(function (reg) {
     return reg.pushManager.getSubscription().then(function (s) {
