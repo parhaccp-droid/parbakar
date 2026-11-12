@@ -52,8 +52,9 @@ body.sbar #sbar{display:block}
 <div id="msg">לא נמצא קוד עובד.<br><br>יש לפתוח פעם אחת את הקישור האישי שקיבלת מהמנהל, ואז להתקין את האפליקציה.</div>
 <script>
 var APP_URL = 'https://script.google.com/macros/s/AKfycbyP3wDHbnMoq-6-5MmTxx6Tv6HPt3OIZShluuvg0wHttHzRFcure4Taw5MMMC5Mxo06BQ/exec';
-var u = new URLSearchParams(location.search).get('u');
-try { if (u) localStorage.setItem('pb_u', u); else u = localStorage.getItem('pb_u'); } catch (e) {}
+var qs = new URLSearchParams(location.search), u = qs.get('u');
+// k=1: כניסה של עובד במכשיר הכללי – לא נשמר כקוד הקבוע של המכשיר
+try { if (u && !qs.get('k')) localStorage.setItem('pb_u', u); else if (!u) u = localStorage.getItem('pb_u'); } catch (e) {}
 if (!u) { document.getElementById('splash').style.display = 'none'; document.getElementById('msg').style.display = 'block'; }
 else {
   var f = document.createElement('iframe');
@@ -72,7 +73,9 @@ function canPush() { return 'serviceWorker' in navigator && 'PushManager' in win
 function tellApp() { if (appWin && mySub) appWin.postMessage({ pb: 'sub', sub: mySub }, '*'); }
 window.addEventListener('message', function (e) {
   var d = e.data || {};
-  if (d.pb === 'hello') { appWin = e.source; appWin.postMessage({ pb: 'launcher', scan: true, bar: true }, '*'); tellApp(); }
+  if (d.pb === 'hello') { appWin = e.source; appWin.postMessage({ pb: 'launcher', scan: true, bar: true, ks: true }, '*'); tellApp(); }
+  // מכשיר כללי: החלפת עובד – טוענים את האפליקציה מחדש עם הקוד החדש (בלי לשנות את הקוד הקבוע של המכשיר)
+  if (d.pb === 'switchuser' && d.u && typeof f !== 'undefined' && f) { try { barOff(); } catch (x) {} f.src = APP_URL + '?u=' + encodeURIComponent(d.u); }
   if (d.pb === 'scanbar') { appWin = e.source; if (d.label) bar.label = d.label; if (d.torch) document.getElementById('btorch').textContent = d.torch; if (d.on) { if (bar.on) document.getElementById('blast').textContent = bar.label; barOn(); } else barOff(); }
   if (d.pb === 'scaninfo') barInfo(d.text || '', d.ok !== false);
   if (d.pb === 'scan') { appWin = e.source; openScan(); }
