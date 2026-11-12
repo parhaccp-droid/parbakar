@@ -48,7 +48,8 @@ body.sbar #sbar{display:block}
 <div id="splash"><img src="icon512.png" alt=""><div>טוען…</div></div>
 <div id="pushbar"><b>לקבל תזכורות לטלפון?</b><button id="pbyes">הפעלה</button><button id="pbno">לא עכשיו</button></div>
 <div id="scan"><video id="svid" playsinline muted></video><div class="frame" id="sfr"></div><div class="tip" id="stip">קרב את הטלפון למדבקה – רק מה שבתוך המסגרת נקלט</div><div class="bar"><button id="storch">פנס</button><button id="snot">הקלדת המספר</button><button id="sclose">ביטול</button></div></div>
-<div id="sbar"><video id="bvid" playsinline muted></video><div class="frame" id="bfr"></div><div class="last" id="blast">קרב מדבקה למסגרת</div><div class="btns"><button id="btorch">פנס</button></div></div>
+<div id="sbar"><video id="bvid" playsinline muted></video><div class="frame" id="bfr"></div><div class="last" id="blast">קרב מדבקה למסגרת</div><div class="btns"><button id="btorch">פנס</button><button id="ksx" style="display:none">⇄</button></div></div>
+<div id="ksfail" style="display:none;position:fixed;left:0;right:0;bottom:0;top:0;z-index:7;background:#f4f1ec;color:#222;padding:40px 24px;font-size:19px;text-align:center"><b>הדף לא נטען</b><br><br><button id="ksre" style="width:100%;border:0;border-radius:16px;padding:18px;font-size:20px;font-weight:bold;background:#7a1f24;color:#fff">נסה שוב</button><br><br><button id="ksbk" style="width:100%;border:0;border-radius:16px;padding:16px;font-size:18px;font-weight:bold;background:#fff;color:#222">⇄ חזרה למסך העובדים</button></div>
 <div id="msg">לא נמצא קוד עובד.<br><br>יש לפתוח פעם אחת את הקישור האישי שקיבלת מהמנהל, ואז להתקין את האפליקציה.</div>
 <script>
 var APP_URL = 'https://script.google.com/macros/s/AKfycbyP3wDHbnMoq-6-5MmTxx6Tv6HPt3OIZShluuvg0wHttHzRFcure4Taw5MMMC5Mxo06BQ/exec';
@@ -60,7 +61,7 @@ else {
   var f = document.createElement('iframe');
   f.src = APP_URL + '?u=' + encodeURIComponent(u);
   f.allow = 'camera; geolocation; clipboard-read';
-  f.onload = function () { var s = document.getElementById('splash'); s.style.opacity = 0; setTimeout(function () { s.remove(); }, 400); };
+  f.onload = function () { var s = document.getElementById('splash'); if (!s) return; s.style.opacity = 0; setTimeout(function () { s.remove(); }, 400); };
   document.body.appendChild(f);
 }
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () {});
@@ -73,9 +74,9 @@ function canPush() { return 'serviceWorker' in navigator && 'PushManager' in win
 function tellApp() { if (appWin && mySub) appWin.postMessage({ pb: 'sub', sub: mySub }, '*'); }
 window.addEventListener('message', function (e) {
   var d = e.data || {};
-  if (d.pb === 'hello') { appWin = e.source; appWin.postMessage({ pb: 'launcher', scan: true, bar: true, ks: true }, '*'); tellApp(); }
+  if (d.pb === 'hello') { appUp(); appWin = e.source; appWin.postMessage({ pb: 'launcher', scan: true, bar: true, ks: true }, '*'); tellApp(); }
   // מכשיר כללי: החלפת עובד – טוענים את האפליקציה מחדש עם הקוד החדש (בלי לשנות את הקוד הקבוע של המכשיר)
-  if (d.pb === 'switchuser' && d.u && typeof f !== 'undefined' && f) { try { barOff(); } catch (x) {} f.src = APP_URL + '?u=' + encodeURIComponent(d.u); }
+  if (d.pb === 'switchuser' && d.u && typeof f !== 'undefined' && f) loadApp(d.u);
   if (d.pb === 'scanbar') { appWin = e.source; if (d.label) bar.label = d.label; if (d.torch) document.getElementById('btorch').textContent = d.torch; if (d.on) { if (bar.on) document.getElementById('blast').textContent = bar.label; barOn(); } else barOff(); }
   if (d.pb === 'scaninfo') barInfo(d.text || '', d.ok !== false);
   if (d.pb === 'scan') { appWin = e.source; openScan(); }
@@ -244,6 +245,27 @@ document.addEventListener('visibilitychange', function () {
   if (!bar.on) return;
   if (document.hidden) barStop(); else { bar.on = false; barOn(); }
 });
+/* ---- מכשיר כללי: תמיד יש דרך חזרה ----
+   בזמן עובד (קוד עם ~) יש כפתור ⇄ גם בפס המצלמה (שייך לאפליקציית ההתקנה, עובד גם אם הדף שבפנים נתקע),
+   ואם הדף לא עלה תוך 25 שניות – מסך עם "נסה שוב" / "חזרה למסך העובדים". */
+var curU = typeof u === 'string' ? u : '', upT = null;
+function devU() { var i = curU.indexOf('~'); return i > 0 ? curU.slice(0, i) : ''; }
+function loadApp(nu) {
+  try { barOff(); } catch (x) {}
+  curU = nu; f.src = APP_URL + '?u=' + encodeURIComponent(nu);
+  document.getElementById('ksx').style.display = devU() ? '' : 'none';
+  document.getElementById('ksfail').style.display = 'none';
+  clearTimeout(upT); upT = setTimeout(appStuck, 25000);
+}
+function appUp() { clearTimeout(upT); upT = null; document.getElementById('ksfail').style.display = 'none'; }
+function appStuck() {
+  var b = document.getElementById('ksfail'); b.style.display = 'block';
+  document.getElementById('ksre').onclick = function () { loadApp(curU); };
+  var bk = document.getElementById('ksbk'); bk.style.display = devU() ? '' : 'none';
+  bk.onclick = function () { loadApp(devU()); };
+}
+document.getElementById('ksx').onclick = function () { if (devU() && confirm('לחזור למסך העובדים? סריקות שלא נשמרו יימחקו')) loadApp(devU()); };
+document.getElementById('ksx').style.display = devU() ? '' : 'none';
 function subscribe() {
   return navigator.serviceWorker.ready.then(function (reg) {
     return reg.pushManager.getSubscription().then(function (s) {
