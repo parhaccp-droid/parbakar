@@ -68,15 +68,17 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catc
 
 /* ---- התראות לטלפון ---- */
 var VAPID = 'BLdukseftel8f8hdq3YpvCeKYj1PFdP7XMiU2L42MXi2DcNDI6jTtztNIxBxzlo1ai0809WHTMlE6NAyuUyMlmE';
-var appWin = null, mySub = null;
+var appWin = null, mySub = null, fresh = false;
 function b64(s) { s = s.replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; var r = atob(s), a = new Uint8Array(r.length); for (var i = 0; i < r.length; i++) a[i] = r.charCodeAt(i); return a; }
 function canPush() { return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
 function tellApp() { if (appWin && mySub) appWin.postMessage({ pb: 'sub', sub: mySub }, '*'); }
 window.addEventListener('message', function (e) {
   var d = e.data || {};
-  if (d.pb === 'hello') { appUp(); appWin = e.source; appWin.postMessage({ pb: 'launcher', scan: true, bar: true, ks: true }, '*'); tellApp(); }
+  if (d.pb === 'hello') { appUp(); fresh = true; armBack(); appWin = e.source; appWin.postMessage({ pb: 'launcher', scan: true, bar: true, ks: true }, '*'); tellApp(); }
   // מכשיר כללי: החלפת עובד – טוענים את האפליקציה מחדש עם הקוד החדש (בלי לשנות את הקוד הקבוע של המכשיר)
   if (d.pb === 'switchuser' && d.u && typeof f !== 'undefined' && f) loadApp(d.u);
+  if (d.pb === 'scanbar' && !fresh) return;   // הודעה מאחרת מהדף הקודם
+  if (d.pb === 'backr') { if (d.more) armBack(); return; }
   if (d.pb === 'scanbar') { appWin = e.source; if (d.label) bar.label = d.label; if (d.torch) document.getElementById('btorch').textContent = d.torch; if (d.on) { if (bar.on) document.getElementById('blast').textContent = bar.label; barOn(); } else barOff(); }
   if (d.pb === 'scaninfo') barInfo(d.text || '', d.ok !== false);
   if (d.pb === 'scan') { appWin = e.source; openScan(); }
@@ -249,10 +251,21 @@ document.addEventListener('visibilitychange', function () {
    בזמן עובד (קוד עם ~) יש כפתור ⇄ גם בפס המצלמה (שייך לאפליקציית ההתקנה, עובד גם אם הדף שבפנים נתקע),
    ואם הדף לא עלה תוך 25 שניות – מסך עם "נסה שוב" / "חזרה למסך העובדים". */
 var curU = typeof u === 'string' ? u : '', upT = null;
+/* ---- כפתור "חזרה" של הטלפון: עובר לאפליקציה (חוזר מסך אחד אחורה). במסך הבית – לחיצה נוספת יוצאת ---- */
+var backArmed = false;
+function armBack() { if (backArmed) return; backArmed = true; try { history.pushState({ pb: 1 }, ''); } catch (x) {} }
+window.addEventListener('popstate', function () {
+  backArmed = false;
+  if (bar.on && !appWin) { barOff(); }
+  if (appWin) appWin.postMessage({ pb: 'back' }, '*');
+});
 function devU() { var i = curU.indexOf('~'); return i > 0 ? curU.slice(0, i) : ''; }
 function loadApp(nu) {
   try { barOff(); } catch (x) {}
-  curU = nu; f.src = APP_URL + '?u=' + encodeURIComponent(nu);
+  curU = nu; appWin = null; fresh = false;
+  // מחליפים את כל המסגרת (ולא רק את הכתובת) – כדי שכפתור "חזרה" של הטלפון לא יחזיר לעובד/מסך קודם
+  var nf = document.createElement('iframe'); nf.allow = f.allow; nf.src = APP_URL + '?u=' + encodeURIComponent(nu);
+  f.parentNode.replaceChild(nf, f); f = nf;
   document.getElementById('ksx').style.display = devU() ? '' : 'none';
   document.getElementById('ksfail').style.display = 'none';
   clearTimeout(upT); upT = setTimeout(appStuck, 25000);
