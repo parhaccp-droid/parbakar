@@ -60,11 +60,17 @@ if (!u) { document.getElementById('splash').style.display = 'none'; document.get
 else {
   var f = document.createElement('iframe');
   f.src = APP_URL + '?u=' + encodeURIComponent(u);
-  f.allow = 'camera; geolocation; clipboard-read';
+  f.allow = 'camera; geolocation; clipboard-read; screen-wake-lock';
   f.onload = function () { var s = document.getElementById('splash'); if (!s) return; s.style.opacity = 0; setTimeout(function () { s.remove(); }, 400); };
   document.body.appendChild(f);
 }
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () {});
+/* ---- המסך לא נכבה כל עוד האפליקציה פתוחה (יוצאים / נועלים – חוזרת ההגדרה של הטלפון) ---- */
+var wl = null;
+function wlOn() { if (wl || document.hidden || !('wakeLock' in navigator)) return; try { navigator.wakeLock.request('screen').then(function (l) { wl = l; l.addEventListener('release', function () { wl = null; }); }).catch(function () {}); } catch (e) {} }
+document.addEventListener('visibilitychange', function () { if (!document.hidden) wlOn(); });
+document.addEventListener('pointerdown', wlOn, true);
+wlOn();
 
 /* ---- התראות לטלפון ---- */
 var VAPID = 'BLdukseftel8f8hdq3YpvCeKYj1PFdP7XMiU2L42MXi2DcNDI6jTtztNIxBxzlo1ai0809WHTMlE6NAyuUyMlmE';
