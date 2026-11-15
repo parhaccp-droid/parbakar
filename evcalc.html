@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>מחשבון כמויות בשר לאירוע – פר בקר</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f7f3ee; --card:#fff; --ink:#2a1f1b; --muted:#7a6c64; --line:#e7ddd3;
+  --brand:#7a1f24; --brand-2:#a8323a; --soft:#f3e6e1; --ok:#2f6b3a; --warn:#a15c00;
+  --frozen:#1f5f8b; --frozen-soft:#e3eef6; --fresh:#2f6b3a; --fresh-soft:#e5f1e6;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:Heebo,system-ui,sans-serif;background:var(--bg);color:var(--ink);font-size:16px;line-height:1.45}
+header{background:var(--brand);color:#fff;padding:22px 20px 26px}
+header .wrap{max-width:1080px;margin:0 auto}
+header h1{margin:0;font-size:26px;font-weight:800}
+header p{margin:4px 0 0;opacity:.85}
+main{max-width:1080px;margin:-14px auto 40px;padding:0 14px;display:grid;gap:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px}
+.card h2{margin:0 0 12px;font-size:18px;display:flex;align-items:center;gap:8px}
+.step{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--brand);color:#fff;font-size:14px;font-weight:700}
+.guests{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.guest{background:var(--soft);border-radius:12px;padding:12px;text-align:center}
+.guest label{display:block;font-weight:700;margin-bottom:6px}
+.guest small{display:block;color:var(--muted);margin-top:4px}
+.stepper{display:flex;align-items:center;justify-content:center;gap:6px}
+.stepper button{width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:#fff;font-size:20px;cursor:pointer;color:var(--brand)}
+.stepper input{width:70px;text-align:center;font-size:22px;font-weight:700;border:1px solid var(--line);border-radius:8px;padding:4px;font-family:inherit}
+.summary-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
+.stat{border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.stat b{display:block;font-size:22px}
+.stat span{color:var(--muted);font-size:13px}
+details.settings{margin-top:10px;color:var(--muted);font-size:14px}
+details.settings summary{cursor:pointer}
+.set-grid{display:flex;flex-wrap:wrap;gap:12px;margin-top:8px}
+.set-grid label{display:flex;align-items:center;gap:6px}
+.set-grid input{width:70px;padding:4px;border:1px solid var(--line);border-radius:6px;font-family:inherit}
+.filters{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 12px;cursor:pointer;font-family:inherit;font-size:14px}
+.chip.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+.search{flex:1;min-width:160px;padding:6px 12px;border:1px solid var(--line);border-radius:999px;font-family:inherit}
+.catalog{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px;max-height:360px;overflow:auto;padding:2px}
+.prod{border:1px solid var(--line);border-radius:10px;padding:9px 11px;cursor:pointer;display:flex;justify-content:space-between;gap:8px;align-items:flex-start;background:#fff}
+.prod:hover{border-color:var(--brand-2)}
+.prod.sel{border-color:var(--brand);background:var(--soft)}
+.prod .n{font-weight:600}
+.prod .meta{font-size:12.5px;color:var(--muted)}
+.tag{font-size:11.5px;border-radius:6px;padding:1px 7px;white-space:nowrap;font-weight:600}
+.tag.frozen{background:var(--frozen-soft);color:var(--frozen)}
+.tag.fresh{background:var(--fresh-soft);color:var(--fresh)}
+table{width:100%;border-collapse:collapse;font-size:15px}
+th{font-size:13px;color:var(--muted);font-weight:500;text-align:right;padding:6px;border-bottom:1px solid var(--line)}
+td{padding:7px 6px;border-bottom:1px solid var(--line);vertical-align:middle}
+td.num,th.num{text-align:left;font-variant-numeric:tabular-nums}
+.share{width:60px;padding:3px;border:1px solid var(--line);border-radius:6px;font-family:inherit;text-align:center}
+.qty{width:66px;padding:3px;border:1px solid var(--line);border-radius:6px;font-family:inherit;text-align:center;font-weight:700}
+.qty.locked{border-color:var(--warn);background:#fff6e8}
+.x{border:none;background:none;color:var(--muted);cursor:pointer;font-size:18px}
+.unlock{border:none;background:none;color:var(--warn);cursor:pointer;font-size:12px;text-decoration:underline;font-family:inherit}
+.sub{font-size:12.5px;color:var(--muted)}
+.empty{color:var(--muted);text-align:center;padding:22px}
+.totals{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}
+.totals .stat b{font-size:20px}
+.bar{height:10px;border-radius:6px;background:var(--line);overflow:hidden;margin-top:6px}
+.bar i{display:block;height:100%;background:var(--ok)}
+.status{margin-top:8px;font-size:14px}
+.status.ok{color:var(--ok)} .status.low{color:var(--brand-2)} .status.high{color:var(--warn)}
+.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;align-items:center}
+.btn{border:none;border-radius:10px;padding:10px 16px;font-family:inherit;font-weight:700;cursor:pointer;font-size:15px}
+.btn.primary{background:var(--brand);color:#fff}
+.btn.ghost{background:#fff;border:1px solid var(--line);color:var(--ink)}
+.disc{display:flex;align-items:center;gap:6px;font-size:14px;color:var(--muted)}
+.disc input{width:60px;padding:4px;border:1px solid var(--line);border-radius:6px;font-family:inherit}
+.toast{font-size:14px;color:var(--ok)}
+.note{font-size:13px;color:var(--muted);margin-top:8px}
+.tables-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:12px;font-size:15px}
+.tables-row label{font-weight:700;display:flex;align-items:center;gap:6px}
+.serve{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:14px}
+.serve-l{font-weight:700}
+.warnmsg{color:var(--brand-2)!important;font-weight:600}
+.tables-row input{width:70px;text-align:center;font-size:18px;font-weight:700;border:1px solid var(--line);border-radius:8px;padding:3px;font-family:inherit}
+.tables-row small{color:var(--muted);flex-basis:100%}
+.mode{display:flex;flex-direction:column;gap:4px;font-size:13px}
+.mode select,.mode input{font-family:inherit;font-size:13px;border:1px solid var(--line);border-radius:6px;padding:2px 4px}
+.mode .per{width:52px;text-align:center}
+.reserve{font-size:12px;color:var(--warn)}
+.no-tables .col-plate{display:none}
+.bigin{width:100%;font-size:20px;font-weight:700;border:1px solid var(--line);border-radius:8px;padding:2px 6px;font-family:inherit;margin:2px 0}
+.budget{display:flex;align-items:center;gap:6px;margin-top:6px;font-size:13px;color:var(--ink);font-weight:600}
+.budget input{width:80px;padding:3px;border:1px solid var(--brand);border-radius:6px;font-family:inherit;font-weight:700}
+.cutl{display:flex;align-items:center;gap:4px}
+.ugw{font-size:12.5px;color:var(--muted);margin-top:4px;display:flex;flex-wrap:wrap;align-items:center;gap:4px}
+.ugw input{width:58px;padding:2px;border:1px solid var(--line);border-radius:6px;font-family:inherit;text-align:center}
+.ask{margin-top:6px;background:#fff6e8;border:1px solid #f0d3a6;border-radius:8px;padding:6px 8px;font-size:13px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.btn.sm{padding:4px 10px;font-size:13px;border-radius:7px}
+textarea.copyfb{width:100%;min-height:160px;margin-top:10px;font-family:inherit;display:none;border:1px solid var(--line);border-radius:8px;padding:8px}
+@media (max-width:720px){
+  .guests,.summary-strip{grid-template-columns:1fr}
+  .totals{grid-template-columns:1fr 1fr}
+  .hide-sm{display:none}
+  table{font-size:14px}
+}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <h1>כמה בשר צריך לאירוע?</h1>
+  <p>פר בקר – קצביה מבית טוב · מחשבון כמויות והצעת מחיר לאירוע</p>
+</div></header>
+
+<main>
+  <section class="card">
+    <h2><span class="step">1</span>כמה סועדים יהיו?</h2>
+    <div class="guests">
+      <div class="guest"><label for="g-men">גברים</label>
+        <div class="stepper"><button data-d="-1" data-t="men">−</button><input id="g-men" type="number" min="0" inputmode="numeric" value="0"><button data-d="1" data-t="men">+</button></div>
+        <small id="h-men"></small></div>
+      <div class="guest"><label for="g-women">נשים</label>
+        <div class="stepper"><button data-d="-1" data-t="women">−</button><input id="g-women" type="number" min="0" inputmode="numeric" value="0"><button data-d="1" data-t="women">+</button></div>
+        <small id="h-women"></small></div>
+      <div class="guest"><label for="g-kids">ילדים</label>
+        <div class="stepper"><button data-d="-1" data-t="kids">−</button><input id="g-kids" type="number" min="0" inputmode="numeric" value="0"><button data-d="1" data-t="kids">+</button></div>
+        <small id="h-kids"></small></div>
+    </div>
+    <div class="summary-strip">
+      <div class="stat"><span>סה"כ סועדים</span><b id="s-guests">0</b></div>
+      <div class="stat"><span>כמות בשר מומלצת</span><b id="s-target">0 ק"ג</b></div>
+      <div class="stat"><span>ממוצע לסועד (גרם) – ניתן לשינוי</span><input id="s-avgin" class="bigin" type="number" min="0" step="10"><span id="s-avgdef" class="sub"></span> <button class="unlock" id="s-avgreset" style="display:none">חזרה לממוצע המומלץ</button></div>
+    </div>
+    <div class="serve">
+      <span class="serve-l">סוג הגשה:</span>
+      <button class="chip" data-serve="general">חישוב כללי (מנגל / בופה)</button>
+      <button class="chip" data-serve="platter">פלטה באמצע השולחן</button>
+    </div>
+    <div class="tables-row" id="platter-box">
+      <label>מספר שולחנות <input id="g-tables" type="number" min="0" inputmode="numeric" value="0"></label>
+      <label>סועדים בשולחן <input id="g-seats" type="number" min="0" inputmode="numeric" value="0"></label>
+      <small id="h-tables"></small>
+    </div>
+    <details class="settings">
+      <summary>כמות לסועד (גרם, משקל גולמי)</summary>
+      <div class="set-grid">
+        <label>גבר <input id="r-men" type="number" min="0" step="50"></label>
+        <label>אישה <input id="r-women" type="number" min="0" step="50"></label>
+        <label>ילד <input id="r-kids" type="number" min="0" step="50"></label>
+      </div>
+    </details>
+  </section>
+
+  <section class="card">
+    <h2><span class="step">2</span>מה על האש?</h2>
+    <div class="filters" id="filters"></div>
+    <div class="catalog" id="catalog"></div>
+    <p class="note"><span class="tag frozen">קפוא</span> נמכר במגשים שלמים בלבד &nbsp;·&nbsp; <span class="tag fresh">טרי</span> נשקל לפי יחידות, בכל כמות</p>
+  </section>
+
+  <section class="card">
+    <h2><span class="step">3</span>ההצעה</h2>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr>
+        <th>מוצר</th><th>חלוקה</th><th class="num">יחידות</th><th class="num col-plate">לפלטה</th><th class="num hide-sm">מגשים</th>
+        <th class="num">משקל</th><th class="num hide-sm">₪ לק"ג</th><th class="num">סה"כ ₪</th><th></th>
+      </tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    </div>
+    <div class="totals">
+      <div class="stat"><span>סה"כ בשר בהצעה</span><b id="t-kg">0 ק"ג</b>
+        <div class="bar"><i id="t-bar" style="width:0"></i></div></div>
+      <div class="stat"><span>ממוצע לסועד</span><b id="t-avg">–</b></div>
+      <div class="stat"><span>מחיר לסועד</span><b id="t-pp">–</b><span class="sub" id="t-ppbase"></span>
+        <label class="budget">תקציב לסועד ₪ <input id="budget" type="number" min="0" step="5" placeholder="ללא"></label>
+        <button class="unlock" id="budget-reset" style="display:none">ביטול תקציב</button></div>
+      <div class="stat"><span>סה"כ לתשלום (כולל מע"מ)</span><b id="t-sum">₪0</b><span id="t-before"></span></div>
+    </div>
+    <div class="status" id="status"></div>
+    <div class="status" id="bstatus"></div>
+    <div class="actions">
+      <button class="btn primary" id="copy">העתקת ההצעה (לוואטסאפ)</button>
+      <button class="btn ghost" id="reset">התחלה מחדש</button>
+      <label class="disc">הנחה לאירוע <input id="disc" type="number" min="0" max="50" step="1" value="0">%</label>
+      <span class="toast" id="toast"></span>
+    </div>
+    <textarea class="copyfb" id="copyfb" readonly></textarea>
+    <p class="note"><b>מנה לכל סועד</b> (שיפוד, סטייק, המבורגר): כל סועד מקבל מנה שלמה, וגם כל סועד בכל שולחן. אפשר לבחור חצי מנה לסועד, למשל סטייק חתוך ל-2, ולבחור אם המנה מיועדת לכולם או למבוגרים בלבד.
+    <b>לפי משקל</b> (קציצות, נקניקיות, כנפיים, וסטייקים שנפרסים לסלייסים): המוצרים האלה משלימים את מה שחסר עד לכמות המומלצת. מוצר קפוא נמכר רק במגשים שלמים, ויחידות שנשארות מעבר למה שצריך מסומנות כרזרבה.
+    אפשר לשנות כמות ידנית בכל שורה, והשורה תינעל על הכמות שהזנתם. המחירים לק"ג כוללים מע"מ. משקל המוצרים הטריים הוא הערכה לפי משקל יחידה ממוצע.</p>
+  </section>
+</main>
+
+<script>
+// ===== קטלוג: [שם, קבוצה, סוג, משקל יחידה בגרם, יחידות במגש, מחיר לק"ג, PLU, אופן הגשה: 1=מנה אישית, 2=נפרס לסלייסים, 0=לפי משקל] =====
+// סוג: "frozen" = קפוא, מגשים שלמים · "fresh" = טרי/מצונן, לפי יחידות
+const CATALOG = [
+  ["קציצות ביתיות","קציצות וקבבים","frozen",65,12,69.9,"702077",0],
+  ["קציצות אסלי","קציצות וקבבים","frozen",65,8,69.9,"702039",0],
+  ["קציצות חריפות","קציצות וקבבים","frozen",65,8,69.9,"702138",0],
+  ["קציצות צנובר","קציצות וקבבים","frozen",65,8,69.9,"702671",0],
+  ["קציצות טלה","קציצות וקבבים","frozen",65,12,79.9,"702404",0],
+  ["קבב ביתי","קציצות וקבבים","frozen",60,9,69.9,"702664",0],
+  ["קבב על מקל קינמון","קציצות וקבבים","frozen",65,6,74.9,"702084",0],
+  ["קבב חרבות ברזל","קציצות וקבבים","frozen",100,5,74.9,"702909",1],
+  ["עראייס מוכן","קציצות וקבבים","frozen",125,4,69.9,"702855",1],
+  ["קציצות ביתיות מצונן","קציצות וקבבים","fresh",65,0,74.9,"500",0],
+  ["קציצות אסלי מצונן","קציצות וקבבים","fresh",65,0,74.9,"501",0],
+  ["קציצות טלה מצונן","קציצות וקבבים","fresh",65,0,84.9,"502",0],
+  ["קבב ביתי טרי","קציצות וקבבים","fresh",60,0,69.9,"1352",0],
+  ["קבב על מקל קינמון מצונן","קציצות וקבבים","fresh",65,0,79.9,"1354",0],
+  ["קבב חרבות ברזל מצונן","קציצות וקבבים","fresh",100,0,79.9,"1355",1],
+  ["עראייס מצונן","קציצות וקבבים","fresh",125,0,74.9,"516",1],
+
+  ["המבורגר אנגוס","המבורגרים","frozen",230,2,69.9,"702459",1],
+  ["המבורגר אמריקאי","המבורגרים","frozen",160,4,69.9,"702169",1],
+  ["מיני-בורגר אנגוס","המבורגרים","frozen",80,10,69.9,"702848",0],
+  ["המבורגר אנגוס מצונן","המבורגרים","fresh",230,0,79.9,"505",1],
+
+  ["נקניקיות מרגז מיוחד","נקניקיות","frozen",70,10,74.9,"702190",0],
+  ["נקניקיות מיני מרגז","נקניקיות","frozen",30,24,74.9,"702336",0],
+  ["נקניקיות מרגז חריף במיוחד","נקניקיות","frozen",53.85,13,74.9,"702329",0],
+  ["נקניקיות אנגוס","נקניקיות","frozen",50,15,74.9,"702305",0],
+  ["נקניקיות פרגיות","נקניקיות","frozen",70,10,64.9,"702992",0],
+  ["מרגז מעיים טבעיות","נקניקיות","frozen",45,8,149.9,"702763",0],
+  ["צוריסוס ארגנטינאי","נקניקיות","frozen",100,8,74.9,"702978",1],
+  ["נקניקיות מרגז מצונן","נקניקיות","fresh",70,0,74.9,"503",0],
+  ["מיני מרגז מצונן","נקניקיות","fresh",30,0,79.9,"1400",0],
+
+  ["פרגיות מתובלנות","עוף והודו","frozen",120,7,84.9,"702206",1],
+  ["כנפיים עוף מתובלנות","עוף והודו","frozen",50,20,22.9,"702954",0],
+  ["סטייק פרגיות מתובל טרי","עוף והודו","fresh",120,0,84.9,"1173",1],
+  ["פרגית מסעדות טרי דק ונקי","עוף והודו","fresh",130,0,84.9,"108",1],
+  ["שיפודי פרגיות מתובלן","עוף והודו","fresh",100,0,84.9,"138",1],
+  ["יקטורי חזה עוף מתובל טרי","עוף והודו","fresh",90,0,59.9,"1383",1],
+  ["כנפיים עוף מתובלנות טרי","עוף והודו","fresh",50,0,22.9,"1164",0],
+  ["לבבות עוף נקי משופד","עוף והודו","fresh",50,0,119.9,"125",0],
+  ["שיפודי שוארמה הודו מתובלן","עוף והודו","fresh",100,0,89.9,"111126",1],
+  ["שיפודי שישליק הודו","עוף והודו","fresh",100,0,44.9,"3",1],
+
+  ["סטייק אנטריקוט טרי","בקר","fresh",250,0,149.9,"152",2],
+  ["אנטריקוט ישראלי פרימיום","בקר","fresh",250,0,299.9,"59",2],
+  ["אנטריקוט זהב 24K","בקר","fresh",250,0,269.9,"1198",2],
+  ["סטייק עגלה PREMIUM","בקר","fresh",200,0,229.9,"26",2],
+  ["פיקנייה פרימיום","בקר","fresh",250,0,179.9,"139",2],
+  ["שיפודי אנטריקוט","בקר","fresh",100,0,139.9,"",1],
+  ["נתח קצבים משופד","בקר","fresh",100,0,209.9,"5",1]
+];
+// מוצרים שאפשר לחתוך ל-2 (פרגיות מסעדות טריות, מתובלות ולא מתובלות)
+const CUTTABLE = ["פרגית מסעדות טרי דק ונקי","סטייק פרגיות מתובל טרי"];
+const PRODUCTS = CATALOG.map((r,i)=>({id:i,name:r[0],group:r[1],kind:r[2],unitG:r[3],perTray:r[4],price:r[5],plu:r[6],portion:r[7]===1,sliced:r[7]===2,cuttable:CUTTABLE.includes(r[0])}));
+const GROUPS = ["הכל", ...new Set(PRODUCTS.map(p=>p.group))];
+
+// ===== מצב =====
+const DEFAULT_RATES = {men:600, women:400, kids:200};
+let state = {defaults:{}, guests:{men:0,women:0,kids:0}, avgG:0, budget:0, serve:"general", tables:0, seats:0, rates:{...DEFAULT_RATES}, items:[], discount:0, group:"הכל", kind:"all", q:""};
+function newItem(pid){ const p=prod(pid); return {pid, mode:p.portion?"portion":"weight", per:1, who:"all", share:1, cut:false, locked:false, units:0}; }
+function save(){ try{localStorage.setItem("perbakar-calc3",JSON.stringify(state))}catch(e){} }
+function load(){ try{const s=JSON.parse(localStorage.getItem("perbakar-calc3")); if(s&&s.guests){ state={...state,...s,group:"הכל",kind:"all",q:""}; state.defaults=state.defaults||{}; state.items=state.items.filter(i=>prod(i.pid)).map(i=>({...newItem(i.pid),...i})); }}catch(e){} }
+
+const $ = id=>document.getElementById(id);
+const fmtKg = kg => (Math.round(kg*100)/100).toLocaleString("he-IL",{maximumFractionDigits:2})+' ק"ג';
+const fmtG = g => Math.round(g).toLocaleString("he-IL")+' גרם';
+const fmtNis = n => "₪"+Math.round(n).toLocaleString("he-IL");
+const fmtNis2 = n => "₪"+(Math.round(n*10)/10).toLocaleString("he-IL",{minimumFractionDigits:1,maximumFractionDigits:1});
+function prod(id){ return PRODUCTS[id]; }
+
+function guestsTotal(){ const g=state.guests; return g.men+g.women+g.kids; }
+function adults(){ return state.guests.men+state.guests.women; }
+function activeTables(){ return state.serve==="platter"&&state.tables>0 ? state.tables : 0; }
+function seatsAt(who){ const t=activeTables(); if(!t) return 0; const all=state.seats>0?state.seats:Math.ceil(guestsTotal()/t); return who==="adults"?Math.min(all,Math.ceil(adults()/t)):all; }
+function defaultKg(){ const g=state.guests,r=state.rates; return (g.men*r.men+g.women*r.women+g.kids*r.kids)/1000; }
+function targetKg(){ return state.avgG>0 ? state.avgG*guestsTotal()/1000 : defaultKg(); }
+function defUnit(p){ return p.kind==="fresh" && state.defaults[p.id]>0 ? state.defaults[p.id] : p.unitG; }
+function unitOf(it){ const p=prod(it.pid); return p.kind==="fresh" && it.unitG>0 ? it.unitG : defUnit(p); }
+let pendingDefault=null; // {pid, g}
+function cutOf(r){ return r.it.cut&&r.p.cuttable?2:1; }
+
+// ===== חישוב =====
+// סדר: (1) שורות נעולות  (2) מנה לכל סועד – לפי מספר הסועדים (ובשולחנות: לפי הסועדים בכל שולחן)
+// (3) לפי משקל, קפוא – מגשים שלמים  (4) לפי משקל, טרי – משלים עד ליעד.
+// מוצר קפוא תמיד מעוגל כלפי מעלה למגש שלם; העודף מוצג כרזרבה.
+function finish(r, pieces){
+  const p=r.p, tables=activeTables(), c=cutOf(r);
+  r.c=c; r.needed=pieces;
+  const whole=Math.ceil(pieces/c);
+  if(p.kind==="frozen"){ r.trays=whole>0?Math.ceil(whole/p.perTray):0; r.units=r.trays*p.perTray; }
+  else { r.trays=0; r.units=whole; }
+  r.reserve=r.units*c-pieces;
+  r.perPlate = tables>0 ? Math.floor(pieces/tables) : 0;
+  r.slicedPlate = tables>0 && p.sliced && r.it.mode!=="portion";
+  r.kg=r.units*r.ug/1000;
+}
+// k = הטיה לפי מחיר: k>0 מעביר משקל למוצרים הזולים, k<0 ליקרים. 0 = החלוקה שנבחרה.
+function compute(k=0){
+  const T=targetKg(), tables=activeTables();
+  const res=state.items.map(it=>({it,p:prod(it.pid),ug:unitOf(it),units:0,trays:0,kg:0,reserve:0,needed:0,perPlate:0,c:1,eff:0}));
+  res.forEach(r=>{ if(r.it.locked) finish(r, r.it.units); });
+  res.forEach(r=>{
+    if(r.it.locked||r.it.mode!=="portion") return;
+    const per=Math.max(0,+r.it.per||0);
+    if(tables>0) finish(r, Math.ceil(per*seatsAt(r.it.who))*tables);
+    else finish(r, Math.ceil(per*(r.it.who==="adults"?adults():guestsTotal())));
+  });
+  const W=res.filter(r=>!r.it.locked&&r.it.mode==="weight");
+  const pref=W.length?Math.exp(W.reduce((a,r)=>a+Math.log(r.p.price),0)/W.length):1;
+  W.forEach(r=>{ r.eff=(+r.it.share||0)*Math.pow(pref/r.p.price,k); });
+  // רצפה: מוצר לא יורד מתחת ל-30% מהחלק שנבחר לו במקור, כדי שההתאמה לתקציב לא תעלים אותו
+  { const sE=W.reduce((x,r)=>x+r.eff,0)||1, sO=W.reduce((x,r)=>x+(+r.it.share||0),0)||1;
+    W.forEach(r=>{ r.eff=Math.max(r.eff/sE, 0.3*(+r.it.share||0)/sO); }); }
+  const usedFixed=res.filter(r=>r.it.locked||r.it.mode==="portion").reduce((a,r)=>a+r.kg,0);
+  const remain=Math.max(0,T-usedFixed);
+  const wFrozen=W.filter(r=>r.p.kind==="frozen"), wFresh=W.filter(r=>r.p.kind==="fresh");
+  const wSum=W.reduce((a,r)=>a+r.eff,0)||1;
+  W.forEach(r=>r.effPct=r.eff/wSum);
+  wFrozen.forEach(r=>{
+    const want=remain*r.eff/wSum, p=r.p, c=cutOf(r), pieceG=r.ug/c;
+    if(want<=0.0001){ finish(r,0); return; }
+    if(tables>0){ const pp=Math.max(1,Math.round(want*1000/pieceG/tables)); finish(r, pp*tables); }
+    else { const trays=Math.max(1,Math.round(want/(p.unitG*p.perTray/1000))); finish(r, trays*p.perTray*c); }
+  });
+  const left=Math.max(0,remain-wFrozen.reduce((a,r)=>a+r.kg,0));
+  const fSum=wFresh.reduce((a,r)=>a+r.eff,0)||1;
+  wFresh.forEach(r=>{
+    const want=left*r.eff/fSum, p=r.p, c=cutOf(r);
+    let pieces = want>0.0001?Math.ceil(want*1000/(r.ug/c)):0;
+    if(tables>0&&pieces>0&&!p.sliced) pieces=Math.ceil(pieces/tables)*tables;
+    finish(r, pieces);
+  });
+  return res;
+}
+const discF=()=>1-(state.discount||0)/100;
+const ppOf=res=>{ const N=guestsTotal(); return N? res.reduce((a,x)=>a+x.kg*x.p.price,0)*discF()/N : 0; };
+// התאמה לתקציב לסועד: מחפשים הטיה k שנותנת מחיר לסועד קרוב לתקציב
+function solveBudget(){
+  const B=state.budget, N=guestsTotal();
+  const base=compute(0);
+  if(!(B>0)||!N) return {res:base,base,msg:""};
+  const W=base.filter(r=>!r.it.locked&&r.it.mode==="weight");
+  if(W.length<2) return {res:base,base,msg:'כדי להתאים לתקציב צריך לפחות שני מוצרים "לפי משקל" במחירים שונים.',bad:true};
+  const lo=compute(-8), hi=compute(8);
+  if(ppOf(hi)>B+0.05) return {res:hi,base,bad:true,msg:`התקציב נמוך מדי למוצרים שנבחרו. המחיר הנמוך ביותר שאפשר להגיע אליו הוא ${fmtNis2(ppOf(hi))} לסועד. כדי לרדת עוד אפשר להוסיף מוצר זול (קציצות, כנפיים), להוריד מוצר יקר, לחתוך פרגיות ל-2 או להוריד את הממוצע לסועד.`};
+  if(ppOf(lo)<B-0.05) return {res:lo,base,bad:true,msg:`התקציב גבוה מהמחיר המקסימלי של המוצרים שנבחרו (${fmtNis2(ppOf(lo))} לסועד). אפשר להוסיף מוצר יקר יותר או להגדיל את הממוצע לסועד.`};
+  let a=-8,b=8,best=base,bd=Math.abs(ppOf(base)-B);
+  for(let i=0;i<40;i++){ const m=(a+b)/2, r=compute(m), v=ppOf(r); const d=Math.abs(v-B); if(d<bd){bd=d;best=r;} if(v>B) a=m; else b=m; }
+  return {res:best,base,msg:`✓ התמהיל הותאם לתקציב: ${fmtNis2(ppOf(best))} לסועד (במקום ${fmtNis2(ppOf(base))}). המשקל הכולל לא השתנה, ורק החלוקה בין המוצרים זזה.`};
+}
+
+// ===== תצוגה =====
+function renderFilters(){
+  const f=$("filters"); f.innerHTML="";
+  GROUPS.forEach(g=>{ const b=document.createElement("button"); b.className="chip"+(state.group===g?" on":""); b.textContent=g;
+    b.onclick=()=>{state.group=g;renderFilters();renderCatalog();}; f.appendChild(b); });
+  [["all","קפוא + טרי"],["frozen","קפוא"],["fresh","טרי"]].forEach(([k,l])=>{ const b=document.createElement("button"); b.className="chip"+(state.kind===k?" on":""); b.textContent=l;
+    b.onclick=()=>{state.kind=k;renderFilters();renderCatalog();}; f.appendChild(b); });
+  const s=document.createElement("input"); s.className="search"; s.placeholder="חיפוש מוצר…"; s.value=state.q;
+  s.oninput=()=>{state.q=s.value;renderCatalog();}; f.appendChild(s);
+}
+function renderCatalog(){
+  const c=$("catalog"); c.innerHTML="";
+  const sel=new Set(state.items.map(i=>i.pid));
+  PRODUCTS.filter(p=>(state.group==="הכל"||p.group===state.group)&&(state.kind==="all"||p.kind===state.kind)&&(!state.q||p.name.includes(state.q)))
+  .forEach(p=>{
+    const d=document.createElement("div"); d.className="prod"+(sel.has(p.id)?" sel":"");
+    const pack = p.kind==="frozen" ? `${p.perTray} יח' × ${fmtG(p.unitG)} = ${fmtKg(p.unitG*p.perTray/1000)} למגש` : `כ-${fmtG(defUnit(p))} ליחידה`;
+    d.innerHTML=`<div><div class="n">${p.name}</div><div class="meta">${pack} · ${fmtNis2(p.price)} לק"ג</div></div>
+      <span class="tag ${p.kind}">${p.kind==="frozen"?"קפוא":"טרי"}</span>`;
+    d.onclick=()=>toggle(p.id); c.appendChild(d);
+  });
+  if(!c.children.length) c.innerHTML='<div class="empty">לא נמצאו מוצרים</div>';
+}
+function toggle(pid){
+  const i=state.items.findIndex(x=>x.pid===pid);
+  if(i>=0) state.items.splice(i,1); else state.items.push(newItem(pid));
+  update(); renderCatalog();
+}
+function renderRows(res){
+  const tb=$("rows"); tb.innerHTML="";
+  if(!res.length){ tb.innerHTML='<tr><td colspan="9" class="empty">בחרו מוצרים בשלב 2</td></tr>'; return; }
+  const disc=1-(state.discount||0)/100;
+  res.forEach(r=>{
+    const tr=document.createElement("tr");
+    const p=r.p, it=r.it;
+    const modeHtml = it.locked ? `<span class="sub">כמות ידנית</span>` : `
+      <div class="mode">
+        <select class="m"><option value="portion" ${it.mode==="portion"?"selected":""}>מנה לכל סועד</option><option value="weight" ${it.mode==="weight"?"selected":""}>לפי משקל</option></select>
+        ${it.mode==="portion"
+          ? `<span><input class="per" type="number" min="0.5" step="0.5" value="${it.per}"> לסועד ·
+             <select class="who"><option value="all" ${it.who==="all"?"selected":""}>לכולם</option><option value="adults" ${it.who==="adults"?"selected":""}>מבוגרים בלבד</option></select></span>`
+          : `<span>חלק יחסי <input class="per share" type="number" min="0" step="1" value="${it.share}"> <span class="sub">(${Math.round((r.effPct||0)*100)}%${state.budget>0?' לפי תקציב':''})</span></span>`}
+        ${!p.cuttable?'':`<label class="cutl"><input type="checkbox" class="cut" ${it.cut?'checked':''}> חתוך ל-2</label>`}
+      </div>`;
+    tr.innerHTML=`
+      <td><div style="font-weight:600">${p.name}</div><span class="tag ${p.kind}">${p.kind==="frozen"?`קפוא · מגש ${p.perTray} יח'`:"טרי"}</span>${p.sliced?' <span class="tag fresh">נפרס לסלייסים</span>':''}
+        ${it.locked?' <button class="unlock">שחרור</button>':''}
+        ${p.kind==="fresh"?`<div class="ugw">משקל ליחידה <input class="ug" type="number" min="1" step="5" value="${Math.round(r.ug*10)/10}"> גרם
+          ${it.unitG>0?`<span class="reserve">להצעה זו בלבד</span> <button class="unlock ugreset">חזרה ל-${fmtG(defUnit(p))}</button>`:''}</div>`:''}
+        ${pendingDefault&&pendingDefault.pid===p.id?`<div class="ask">לקבע ${fmtG(pendingDefault.g)} כמשקל ברירת המחדל של ${p.name}?
+          <button class="btn primary sm ask-yes">כן, לקבע</button> <button class="btn ghost sm ask-no">רק להצעה הזו</button></div>`:''}</td>
+      <td>${modeHtml}</td>
+      <td class="num"><input class="qty${it.locked?' locked':''}" type="number" min="0" step="${p.kind==='frozen'?p.perTray:1}" value="${p.kind==='frozen'?r.units:r.needed}">
+        ${r.c===2?`<div class="sub">חצאים · ${r.units} שלמים</div>`:''}
+        ${r.reserve>0?`<div class="reserve">מתוכן ${r.reserve} רזרבה (מגש שלם)</div>`:''}</td>
+      <td class="num col-plate">${activeTables()>0?(r.slicedPlate?fmtG(r.kg*1000/activeTables()):r.perPlate):''}</td>
+      <td class="num hide-sm">${p.kind==="frozen"?r.trays:'–'}</td>
+      <td class="num">${fmtKg(r.kg)}</td>
+      <td class="num hide-sm">${fmtNis2(p.price*disc)}</td>
+      <td class="num">${fmtNis(r.kg*p.price*disc)}</td>
+      <td><button class="x" title="הסרה">×</button></td>`;
+    const m=tr.querySelector(".m"); if(m) m.onchange=e=>{it.mode=e.target.value;update();};
+    const per=tr.querySelector(".per:not(.share)"); if(per) per.onchange=e=>{it.per=Math.max(0.5,+e.target.value||1);update();};
+    const sh=tr.querySelector(".share"); if(sh) sh.onchange=e=>{it.share=Math.max(0,+e.target.value||0);update();};
+    const ug=tr.querySelector(".ug"); if(ug) ug.onchange=e=>{ const v=Math.round((+e.target.value||0)*10)/10; if(!(v>0)) return update();
+      if(v===defUnit(p)){ delete it.unitG; pendingDefault=null; } else { it.unitG=v; pendingDefault={pid:p.id,g:v}; } update(); };
+    const ugr=tr.querySelector(".ugreset"); if(ugr) ugr.onclick=()=>{ delete it.unitG; if(pendingDefault&&pendingDefault.pid===p.id) pendingDefault=null; update(); };
+    const ay=tr.querySelector(".ask-yes"); if(ay) ay.onclick=()=>{ state.defaults[p.id]=pendingDefault.g; delete it.unitG; pendingDefault=null; update(); renderCatalog(); };
+    const an=tr.querySelector(".ask-no"); if(an) an.onclick=()=>{ pendingDefault=null; update(); };
+    const cut=tr.querySelector(".cut"); if(cut) cut.onchange=e=>{it.cut=e.target.checked;update();};
+    const who=tr.querySelector(".who"); if(who) who.onchange=e=>{it.who=e.target.value;update();};
+    tr.querySelector(".qty").onchange=e=>{ let v=Math.max(0,Math.round(+e.target.value||0)); if(p.kind==="frozen") v=Math.ceil(v/p.perTray)*p.perTray*cutOf(r); it.units=v; it.locked=true; update(); };
+    const u=tr.querySelector(".unlock"); if(u) u.onclick=()=>{it.locked=false;update();};
+    tr.querySelector(".x").onclick=()=>toggle(p.id);
+    tb.appendChild(tr);
+  });
+}
+let lastRes=[];
+function update(){
+  const g=state.guests,r=state.rates;
+  ["men","women","kids"].forEach(k=>{ $("g-"+k).value=g[k]; $("r-"+k).value=r[k]; $("h-"+k).textContent=fmtG(r[k])+" לסועד"; });
+  $("g-tables").value=state.tables;
+  const N=guestsTotal(), T=targetKg(), tables=activeTables();
+  $("g-seats").value=state.seats;
+  document.querySelectorAll("[data-serve]").forEach(b=>b.classList.toggle("on",b.dataset.serve===state.serve));
+  $("platter-box").style.display = state.serve==="platter" ? "" : "none";
+  const ht=$("h-tables"); ht.className="";
+  if(state.serve==="platter"){
+    const seatsTot=state.tables*state.seats;
+    if(!state.tables||!state.seats) ht.textContent="הזינו כמה שולחנות יהיו וכמה סועדים יושבים בכל שולחן. מנה אישית תחושב כך שכל סועד בכל שולחן יקבל מנה.";
+    else if(N&&seatsTot<N){ ht.className="warnmsg"; ht.textContent=`${state.tables} שולחנות × ${state.seats} = ${seatsTot} מקומות, אבל יש ${N} סועדים. חסרים ${N-seatsTot} מקומות: הוסיפו שולחן או סועדים לשולחן.`; }
+    else ht.textContent=`${seatsTot} מקומות ישיבה${N?` ל-${N} סועדים`:''}. בכל פלטה יש מנה אישית לכל אחד מ-${state.seats} הסועדים בשולחן.`;
+  }
+  document.body.classList.toggle("no-tables", !(tables>0));
+  $("s-guests").textContent=N.toLocaleString("he-IL");
+  $("s-target").textContent=fmtKg(T);
+  const defAvg=N?defaultKg()*1000/N:0;
+  if(document.activeElement!==$("s-avgin")) $("s-avgin").value = N ? Math.round(state.avgG>0?state.avgG:defAvg) : "";
+  $("s-avgdef").textContent = N ? (state.avgG>0?`מומלץ לפי הרכב הסועדים: ${fmtG(defAvg)}`:"מחושב לפי הרכב הסועדים") : "";
+  $("s-avgreset").style.display = state.avgG>0 ? "" : "none";
+  const sol=solveBudget(); const res=sol.res; lastRes=res; renderRows(res);
+  if(document.activeElement!==$("budget")) $("budget").value = state.budget>0?state.budget:"";
+  $("budget-reset").style.display = state.budget>0?"":"none";
+  $("t-ppbase").textContent = state.budget>0&&N ? `התמהיל המקורי: ${fmtNis2(ppOf(sol.base))}` : "";
+  const bs=$("bstatus"); bs.textContent=sol.msg; bs.className="status "+(sol.bad?"low":"ok");
+  const kg=res.reduce((a,x)=>a+x.kg,0);
+  const disc=discF();
+  const sumFull=res.reduce((a,x)=>a+x.kg*x.p.price,0), sum=sumFull*disc;
+  $("t-kg").textContent=fmtKg(kg);
+  $("t-avg").textContent=N?fmtG(kg*1000/N):"–";
+  $("t-pp").textContent=N?fmtNis2(sum/N):"–";
+  $("t-sum").textContent=fmtNis(sum);
+  $("t-before").textContent=state.discount>0?`לפני הנחה ${fmtNis(sumFull)}`:"";
+  const pct=T?kg/T*100:0; $("t-bar").style.width=Math.min(100,pct)+"%";
+  const st=$("status");
+  if(!N){ st.className="status"; st.textContent="הזינו את מספר הסועדים בשלב 1."; }
+  else if(!res.length){ st.className="status"; st.textContent="בחרו מוצרים בשלב 2. הכמויות יחושבו אוטומטית."; }
+  else { const d=kg-T;
+    if(Math.abs(d)<=Math.max(0.5,T*0.05)){ st.className="status ok"; st.textContent=`✓ הכמות מתאימה ליעד (${d>=0?"+":"−"}${fmtKg(Math.abs(d))}).`; }
+    else if(d<0){ st.className="status low"; st.textContent=`חסרים ${fmtKg(-d)} כדי להגיע לכמות המומלצת. הוסיפו מוצר "לפי משקל" (קציצות, נקניקיות), או הגדילו מנה לסועד.`; }
+    else { st.className="status high"; st.textContent=`ההצעה גבוהה ב-${fmtKg(d)} מהכמות המומלצת. הסיבה היא מנות אישיות, עיגול למגשים שלמים או כמויות ידניות.`; }
+  }
+  save();
+}
+function quoteText(){
+  const g=state.guests,N=guestsTotal(),disc=1-(state.discount||0)/100,tables=activeTables();
+  let t=`הצעה לאירוע – פר בקר\nסועדים: ${N} (${g.men} גברים, ${g.women} נשים, ${g.kids} ילדים)${tables>0?` · ${tables} שולחנות × ${seatsAt('all')} סועדים, פלטה באמצע השולחן`:''}\n\n`;
+  let kg=0,sum=0;
+  lastRes.forEach(r=>{ if(!r.units) return; const c=r.kg*r.p.price*disc; kg+=r.kg; sum+=c;
+    let line = r.c===2 ? `• ${r.p.name} חתוך ל-2: ${r.needed} חצאים (${r.units} יח')` : `• ${r.p.name}: ${r.needed} יח'`;
+    if(tables>0) line+= r.slicedPlate ? ` (פרוס, כ-${fmtG(r.kg*1000/tables)} לפלטה)` : ` (${r.perPlate} לפלטה)`;
+    if(r.p.kind==="frozen") line+=` – ${r.trays} מגשים${r.reserve>0?` (+${r.reserve} רזרבה)`:''}`;
+    t+=line+` – ${fmtKg(r.kg)} – ${fmtNis(c)}\n`; });
+  t+=`\nסה"כ בשר: ${fmtKg(kg)} (כ-${N?fmtG(kg*1000/N):'–'} לסועד)\nסה"כ לתשלום: ${fmtNis(sum)} כולל מע"מ`;
+  if(state.discount>0) t+=` (כולל ${state.discount}% הנחה)`;
+  t+=`\n\n* משקל המוצרים הטריים משוער – המחיר הסופי לפי שקילה.`;
+  return t;
+}
+
+// ===== אירועים =====
+document.querySelectorAll(".stepper button").forEach(b=>b.onclick=()=>{ const k=b.dataset.t; state.guests[k]=Math.max(0,state.guests[k]+(+b.dataset.d)); update(); });
+["men","women","kids"].forEach(k=>{
+  $("g-"+k).oninput=e=>{ state.guests[k]=Math.max(0,Math.round(+e.target.value||0)); update(); };
+  $("r-"+k).onchange=e=>{ state.rates[k]=Math.max(0,+e.target.value||0); update(); };
+});
+$("g-tables").oninput=e=>{ state.tables=Math.max(0,Math.round(+e.target.value||0)); update(); };
+$("g-seats").oninput=e=>{ state.seats=Math.max(0,Math.round(+e.target.value||0)); update(); };
+document.querySelectorAll("[data-serve]").forEach(b=>b.onclick=()=>{ state.serve=b.dataset.serve; update(); });
+$("s-avgin").oninput=e=>{ const v=Math.round(+e.target.value||0); state.avgG = v>0?v:0; update(); };
+$("s-avgreset").onclick=()=>{ state.avgG=0; $("s-avgin").blur(); update(); };
+$("budget").oninput=e=>{ const v=+e.target.value||0; state.budget=v>0?v:0; update(); };
+$("budget-reset").onclick=()=>{ state.budget=0; update(); };
+$("disc").oninput=e=>{ state.discount=Math.min(50,Math.max(0,+e.target.value||0)); update(); };
+$("reset").onclick=()=>{ state.guests={men:0,women:0,kids:0}; state.serve="general"; state.tables=0; state.seats=0; state.items=[]; state.discount=0; state.avgG=0; state.budget=0; state.rates={...DEFAULT_RATES}; $("disc").value=0; update(); renderCatalog(); };
+$("copy").onclick=async()=>{
+  const txt=quoteText();
+  try{ await navigator.clipboard.writeText(txt); $("toast").textContent="ההצעה הועתקה ✓"; $("copyfb").style.display="none"; }
+  catch(e){ const ta=$("copyfb"); ta.value=txt; ta.style.display="block"; ta.select(); $("toast").textContent="סמנו והעתיקו את הטקסט מהתיבה"; }
+  setTimeout(()=>$("toast").textContent="",3000);
+};
+
+load(); $("disc").value=state.discount||0; renderFilters(); renderCatalog(); update();
+</script>
+</body>
+</html>
