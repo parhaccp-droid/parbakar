@@ -130,6 +130,20 @@ function gotCodes(found) {
   gotCodes.list = found.slice(); gotCodes.img = grabFrame(); beep(); document.getElementById('sfr').className = 'frame hit';
   setTimeout(function () { var l = gotCodes.list; gotCodes.list = null; scanDone(l, gotCodes.img); }, 1500);   // אוסף עוד רגע את שאר הברקודים שבמסגרת
 }
+// מדבקה עם פסים דקים (למשל ברקת – Code128 של 19 ספרות) לפעמים לא נקראת מהווידאו המלא.
+// לכן כל כמה פעמים מנסים גם רק את האזור שבתוך המסגרת, מוגדל פי 2–3, בתמונה נפרדת.
+function zoomDetect(det, v, box) {
+  try {
+    var b = box(v); if (!b) return Promise.resolve([]);
+    var x = Math.max(0, b.x1), y = Math.max(0, b.y1), w = Math.min(v.videoWidth, b.x2) - x, h = Math.min(v.videoHeight, b.y2) - y;
+    if (w < 20 || h < 20) return Promise.resolve([]);
+    var k = Math.max(1, Math.min(3, 2400 / w)), c = zoomDetect.c || (zoomDetect.c = document.createElement('canvas'));
+    c.width = Math.round(w * k); c.height = Math.round(h * k);
+    var g = c.getContext('2d'); g.imageSmoothingEnabled = true; g.drawImage(v, x, y, w, h, 0, 0, c.width, c.height);
+    return det.detect(c).then(function (r) { return r.map(function (z) { return z.rawValue; }); }).catch(function () { return []; });
+  } catch (e) { return Promise.resolve([]); }
+}
+function autoFocus(track) { try { track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(function () {}); } catch (e) {} }
 function openScan() {
   gotCodes.list = null;
   var box = document.getElementById('scan'), v = document.getElementById('svid');
@@ -144,12 +158,15 @@ function openScan() {
     tb.onclick = function () { torch = !torch; track.applyConstraints({ advanced: [{ torch: torch }] }).catch(function () {}); };
     if ('BarcodeDetector' in window) {
       var det = new BarcodeDetector({ formats: ['code_128', 'ean_13', 'data_matrix', 'qr_code', 'ean_8', 'itf', 'code_39', 'upc_a'] });
+      var tick = 0; autoFocus(track);
       scanTimer = setInterval(function () {
         if (v.readyState < 2) return;
+        var zoom = ++tick % 4 === 0;
         det.detect(v).then(function (r) {
           // רק ברקודים שנמצאים כולם בתוך המסגרת הלבנה
           r = r.filter(function (x) { var b = x.boundingBox; return inFrame(v, x.cornerPoints && x.cornerPoints.length ? x.cornerPoints : b ? [{ x: b.x, y: b.y }, { x: b.x + b.width, y: b.y + b.height }] : null); });
-          if (r.length) gotCodes(r.map(function (x) { return x.rawValue; }));
+          if (r.length) return gotCodes(r.map(function (x) { return x.rawValue; }));
+          if (zoom) zoomDetect(det, v, frameBox).then(function (l) { if (l.length && scanTimer) gotCodes(l); });
         }).catch(function () {});
       }, 150);
     } else zxScan(v);
@@ -217,11 +234,14 @@ function barOn() {
     tb.onclick = function () { torch = !torch; track.applyConstraints({ advanced: [{ torch: torch }] }).catch(function () {}); };
     if ('BarcodeDetector' in window) {
       var det = new BarcodeDetector({ formats: ['code_128', 'ean_13', 'data_matrix', 'qr_code', 'ean_8', 'itf', 'code_39', 'upc_a'] });
+      var tick = 0; autoFocus(track);
       bar.timer = setInterval(function () {
         if (v.readyState < 2) return;
+        var zoom = ++tick % 4 === 0;
         det.detect(v).then(function (r) {
           r = r.filter(function (x) { var b = x.boundingBox; return barIn(v, x.cornerPoints && x.cornerPoints.length ? x.cornerPoints : b ? [{ x: b.x, y: b.y }, { x: b.x + b.width, y: b.y + b.height }] : null); });
-          if (r.length) barGot(r.map(function (x) { return x.rawValue; }));
+          if (r.length) return barGot(r.map(function (x) { return x.rawValue; }));
+          if (zoom) zoomDetect(det, v, barBox).then(function (l) { if (l.length && bar.on) barGot(l); });
         }).catch(function () {});
       }, 150);
     } else {
